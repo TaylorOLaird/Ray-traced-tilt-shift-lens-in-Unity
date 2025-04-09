@@ -63,7 +63,7 @@ RayHit Trace(Ray ray) {
     RayHit bestHit = CreateRayHit();
 
     // Add a floating unit sphere
-    IntersectSphere(ray, bestHit, float4(0, 0.0f, 0, 1.0f)); 
+    IntersectSphere(ray, bestHit, float4(0.0f, 0.0f, -5.0f, 1.0f)); 
 
     return bestHit;
 }
@@ -87,7 +87,7 @@ float3 Shade(inout Ray ray, RayHit hit)
 Ray CreateCameraRay(float2 uv)
 {
     // Transform the camera origin to world space
-    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 10.0f, 1.0f)).xyz;
+    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
     
     // Invert the perspective projection of the view-space position
     float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
