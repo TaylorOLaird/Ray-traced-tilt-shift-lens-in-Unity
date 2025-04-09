@@ -2,15 +2,6 @@
 RWTexture2D<float4> Result;
 float4x4 _CameraToWorld;
 float4x4 _CameraInverseProjection;
-int _FrameCount;
-
-float3 _FocusA;
-float3 _FocusB;
-float3 _FocusC;
-float _FocalLength;
-float _FStop;
-float3 _Middle;
-float _SensorSize;
 
 Texture2D<float4> _SkyboxTexture;
 SamplerState sampler_SkyboxTexture;
@@ -44,79 +35,6 @@ Ray CreateRay(float3 origin, float3 direction)
     ray.origin = origin;
     ray.direction = direction;
     return ray;
-}
-
-Ray tilt_shift(float2 screen, float2 random)
-{
-    float3 focus_a = _FocusA;
-    float3 focus_b = _FocusB;
-    float3 focus_c = _FocusC;
-    float focal_length = _FocalLength;
-    float f_stop = _FStop;
-    float3 middle = _Middle;
-    float sensor_size = _SensorSize;
-
-    // 1) Compute plane normal
-    float3 normal = normalize( cross( focus_b - focus_a, focus_c - focus_a ) );
-
-    // 2) Compute tilt
-    float3 tilt = float3(0,0,0);
-    
-    if (abs(normal.x) > abs(normal.y))
-    {
-        tilt.x = (focus_a.z - focus_b.z) * focal_length
-               / ( focus_a.z * focus_b.x - focus_b.z * focus_a.x
-                 + (focus_a.z * focus_b.y - focus_b.z * focus_a.y) * (normal.y / normal.x) );
-        tilt.y = tilt.x * (normal.y / normal.x);
-    }
-    else if (abs(normal.y) > 0.0)
-    {
-        tilt.y = (focus_a.z - focus_b.z) * focal_length
-               / ( focus_a.z * focus_b.y - focus_b.z * focus_a.y
-                 + (focus_a.z * focus_b.x - focus_b.z * focus_a.x) * (normal.x / normal.y) );
-        tilt.x = tilt.y * (normal.x / normal.y);
-    }
-
-    tilt.z = sqrt(1.0f - tilt.x*tilt.x - tilt.y*tilt.y);
-
-    // 3) Create an orthonormal basis around the tilt
-    float3 basis_u = normalize(cross(tilt, (abs(tilt.x) > abs(tilt.y)) 
-        ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0)));
-    float3 basis_v = cross(tilt, basis_u);
-
-    // 4) Aperture
-    float aperture = focal_length / f_stop;
-
-    // 5) Focal plane
-    float image_plane = focus_a.z * focal_length / ( dot(focus_a, tilt) - focal_length );
-    float2 shift = (middle.xy / middle.z) * -image_plane; 
-
-    // 6) Move sensor point
-    //    (Note: ‘sensor_size’ is presumably scalar in your snippet, 
-    //     but if you have separate x/y sizes, you might store float2.)
-    float3 sensor = float3( screen * 0.5f * sensor_size + shift, -image_plane );
-
-    // 7) Jitter the lens with your random
-    float theta = 6.28318531f * random.x;
-    float r = 0.5f * aperture * sqrt(random.y);
-    float3 lens = (cos(theta) * basis_u + sin(theta) * basis_v) * r;
-    float4 lens4 = float4(lens, 1.0f);
-    float3 origin = mul(_CameraToWorld, lens4).xyz;
-
-    // 8) Focus
-    float3 focused = sensor * (focal_length / (focal_length + dot(sensor, tilt)));
-    float flip = sign(dot(tilt, focused));
-    // float flip = 1.0f;
-
-    float3 tilt_direction = normalize(focused - lens) * flip;
-
-    // float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
-    // // Transform the direction from camera to world space and normalize
-    float3 direction = mul(_CameraToWorld, float4(tilt_direction, 0.0f)).xyz;
-    direction = normalize(direction);
-
-    // 9) Final out parameters
-    return CreateRay(origin, direction);
 }
 
 void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
@@ -210,14 +128,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     // Transform pixel to [-1,1] range
     float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
     // Get a ray for the UVs
-    // Ray ray = CreateCameraRay(uv);
-
-    float3 origin, direction;
-    float2 screenCoord = uv * 2.0f - 1.0f;
-    uint2 pixelSeed = id.xy + uint2(_FrameCount * 1337, _FrameCount * 1337);
-    float2 rand2D = GenerateRandom(pixelSeed);
-    // float2 rand2D = {0, 0};
-    Ray ray = tilt_shift(screenCoord, rand2D);
+    Ray ray = CreateCameraRay(uv);
 
     // color background based on ray direction
     // Result[id.xy] = float4(ray.direction * 0.5f + 0.5f, 1.0f);
@@ -227,26 +138,3 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float3 result = Shade(ray, hit);
     Result[id.xy] = float4(result, 1);
 }
-
-// void CSMain (uint3 id : SV_DispatchThreadID)
-// {
-//     // Compute screen coords
-//     float2 pixel = dispatchThreadID.xy;
-//     float2 uv = (pixel + 0.5) / float2(_RenderWidth, _RenderHeight); // [0..1]
-//     float2 screenCoord = uv * 2.0f - 1.0f;                           // [-1..1]
-
-//     // Some random for the lens sampling
-//     float2 rand2D = GenerateRandom(dispatchThreadID.xy);
-
-//     // Call tilt_shift
-//     float3 origin, direction;
-//     tilt_shift(screenCoord, rand2D, origin, direction);
-
-//     // color background based on ray direction
-//     // Result[id.xy] = float4(ray.direction * 0.5f + 0.5f, 1.0f);
-
-//     // Trace and shade
-//     RayHit hit = Trace(ray);
-//     float3 result = Shade(ray, hit);
-//     Result[id.xy] = float4(result, 1);
-// }

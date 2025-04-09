@@ -303,7 +303,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 2.5}
+  m_LocalPosition: {x: 0, y: 0, z: -2.75}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -321,7 +321,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a659b95b898713f49b911686f72bfba1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  RayTracingShader: {fileID: 7200000, guid: 152d4ac2f32fa014d8904d34e127b9bb, type: 3}
+  RayTracingShader: {fileID: 7200000, guid: d8983e604556f744da6b0d29c3873c1d, type: 3}
   SkyboxTexture: {fileID: 2800000, guid: ae6ce5852fd007948905789de8115039, type: 3}
   focus_a: {x: 0, y: 1.73, z: 1}
   focus_b: {x: -1, y: 0, z: 1}
