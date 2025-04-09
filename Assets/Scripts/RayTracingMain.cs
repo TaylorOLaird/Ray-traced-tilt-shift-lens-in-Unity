@@ -10,6 +10,21 @@ public class RayTracingMain : MonoBehaviour
 
     public Texture SkyboxTexture;
 
+    [SerializeField] Vector3 focus_a = new Vector3(0.0f, 0.0f, 1.0f);
+    [SerializeField] Vector3 focus_b = new Vector3(0.0f, 1.0f, 0.0f);
+    [SerializeField] Vector3 focus_c = new Vector3(1.0f, 0.0f, 0.0f);
+    [SerializeField] float focal_length = 0.25f;
+    [SerializeField] float f_stop = 1.0f;
+    [SerializeField] Vector3 middle = new Vector3(0.0f, 0.0f, 1.0f);
+    [SerializeField] float sensor_size = 1.0f;
+
+    // float3 _FocusA;
+    // float3 _FocusB;
+    // float3 _FocusC;
+    // float _FocalLength;
+    // float _FStop;
+    // float3 _Middle;
+    // float _SensorSize;
 
     private void Awake()
     {
@@ -21,6 +36,17 @@ public class RayTracingMain : MonoBehaviour
         RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
         RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
         RayTracingShader.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
+        int frameCount = Time.frameCount; // or keep your own counter
+        RayTracingShader.SetInt("_FrameCount", frameCount);
+
+        RayTracingShader.SetVector("_FocusA", focus_a);
+        RayTracingShader.SetVector("_FocusB", focus_b);
+        RayTracingShader.SetVector("_FocusC", focus_c);
+        RayTracingShader.SetFloat("_FocalLength", focal_length);
+        RayTracingShader.SetFloat("_FStop", f_stop);
+        RayTracingShader.SetVector("_Middle", middle);
+        RayTracingShader.SetFloat("_SensorSize", sensor_size);
+
     }
 
 
@@ -28,6 +54,7 @@ public class RayTracingMain : MonoBehaviour
     {
         SetShaderParameters();
         Render(destination);
+
     }
 
     private void Render(RenderTexture destination)

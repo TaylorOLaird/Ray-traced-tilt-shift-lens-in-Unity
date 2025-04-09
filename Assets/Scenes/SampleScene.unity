@@ -302,13 +302,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 2.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &963194229
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -323,6 +323,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   RayTracingShader: {fileID: 7200000, guid: 152d4ac2f32fa014d8904d34e127b9bb, type: 3}
   SkyboxTexture: {fileID: 2800000, guid: ae6ce5852fd007948905789de8115039, type: 3}
+  focus_a: {x: 0, y: 1.73, z: 1}
+  focus_b: {x: -1, y: 0, z: 1}
+  focus_c: {x: 1, y: 0, z: 1}
+  focal_length: 0.25
+  f_stop: 1
+  middle: {x: 0, y: 0.57, z: 1}
+  sensor_size: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

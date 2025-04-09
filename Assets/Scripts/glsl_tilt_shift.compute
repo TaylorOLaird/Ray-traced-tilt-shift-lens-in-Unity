@@ -1,0 +1,52 @@
+// glsl code from TILT-SHIFT RENDERING USING A THIN LENS MODEL by Andrew Kensler
+
+// Notes: we will assume that everything is in camera space, with +z 
+// pointing down the view direction and the lens centered on the origin.
+
+void tilt_shift(vec2 screen, vec2 random, out vec3 ray_origin , out vec3 ray_direction)
+{
+    // n  : normal A : focus_a
+    // t  : tilt B : focus_b
+    // M  : middle C : focus_c
+    // M' : shift
+
+    // Focal plane values (precomputable)
+    vec3 normal = normalize(cross(focus_b - focus_a , focus_c - focus_a));
+    // Lens values (precomputable)
+    vec3 tilt = vec3(0.0);
+
+    if (abs(normal.x) > abs(normal.y)) {
+        tilt.x = (focus_a.z - focus_b.z) * focal_length / (focus_a.z * focus_b.x - focus_b.z * focus_a.x + (focus_a.z * focus_b.y - focus_b.z * focus_a.y) * normal.y / normal.x);
+        tilt.y = tilt.x * normal.y / normal.x;
+    }
+    else if (abs(normal.y) > 0.0) {
+        tilt.y = (focus_a.z - focus_b.z) * focal_length / (focus_a.z * focus_b.y - focus_b.z * focus_a.y + (focus_a.z * focus_b.x - focus_b.z * focus_a.x) * normal.x / normal.y);
+        tilt.x = tilt.y * normal.x / normal.y;
+    }
+
+    tilt.z = sqrt(1.0 - tilt.x * tilt.x - tilt.y * tilt.y);
+
+    vec3 basis_u = normalize(cross(tilt, abs(tilt.x) > abs(tilt.y) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+    vec3 basis_v = cross(tilt, basis_u);
+    
+    float aperture = focal_length / f_stop;
+
+    // Image plane values (precomputable)
+    float image_plane = focus_a.z * focal_length / (dot(focus_a , tilt) - focal_length);
+    vec2 shift = middle.xy / middle.z * -image_plane;
+
+    // Image plane values (render -time)
+    vec3 sensor = vec3(screen * 0.5 * sensor_size + shift, -image_plane);
+
+    // Lens values (render-time)
+    float theta = 6.28318531 * random.x;
+    float r = 0.5 * aperture * sqrt(random.y);
+    vec3 lens = (cos(theta) * basis_u + sin(theta) * basis_v) * r;
+    
+    // Focal plane values (render-time)
+    vec3 focused = sensor * focal_length / (focal_length + dot(sensor, tilt));
+    float flip = sign(dot(tilt, focused));
+
+    ray_origin = lens;
+    ray_direction = flip * normalize(focused - lens);
+}
