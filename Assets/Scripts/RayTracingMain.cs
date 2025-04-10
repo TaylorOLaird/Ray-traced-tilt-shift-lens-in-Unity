@@ -17,6 +17,7 @@ public class RayTracingMain : MonoBehaviour
     [SerializeField] float f_stop = 1.0f;
     [SerializeField] Vector3 middle = new Vector3(0.0f, 0.0f, 1.0f);
     [SerializeField] float sensor_size = 1.0f;
+    [SerializeField] float s = 1.0f;
 
     // float3 _FocusA;
     // float3 _FocusB;
@@ -46,6 +47,7 @@ public class RayTracingMain : MonoBehaviour
         RayTracingShader.SetFloat("_FStop", f_stop);
         RayTracingShader.SetVector("_Middle", middle);
         RayTracingShader.SetFloat("_SensorSize", sensor_size);
+        RayTracingShader.SetFloat("_S", s);
 
     }
 

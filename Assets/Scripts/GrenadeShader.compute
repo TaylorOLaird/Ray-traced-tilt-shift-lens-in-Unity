@@ -1,0 +1,301 @@
+#pragma kernel CSMain
+RWTexture2D<float4> Result;
+float4x4 _CameraToWorld;
+float4x4 _WorldToCamera;
+float4x4 _CameraInverseProjection;
+int _FrameCount;
+
+float3 _FocusA;
+float3 _FocusB;
+float3 _FocusC;
+float _FocalLength;
+float _FStop;
+float3 _Middle;
+float _SensorSize;
+float _S;
+
+Texture2D<float4> _SkyboxTexture;
+SamplerState sampler_SkyboxTexture;
+static const float PI = 3.14159265f;
+
+struct Ray
+{
+    float3 origin;
+    float3 direction;
+};
+
+struct RayHit
+{
+    float3 position;
+    float distance;
+    float3 normal;
+};
+
+RayHit CreateRayHit()
+{
+    RayHit hit;
+    hit.position = float3(0.0f, 0.0f, 0.0f);
+    hit.distance = 1.#INF;
+    hit.normal = float3(0.0f, 0.0f, 0.0f);
+    return hit;
+}
+
+Ray CreateRay(float3 origin, float3 direction)
+{
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    return ray;
+}
+
+Ray thin_lens(float2 screen, float2 random)
+{
+    // f : focal_length p : focal_distance
+    // n : f_stop P : focused
+    // s : image_plane O : ray_origin
+    // P' : sensor d : ray_direction
+    float focal_length = _FocalLength;
+    float f_stop = _FStop;
+    float focal_distance = _S + focal_length;
+    float sensor_size = _SensorSize;
+
+
+    // Lens values (precomputable)
+    float aperture = focal_length / f_stop;
+    // Image plane values (precomputable)
+    float image_plane = focal_distance * focal_length / (focal_distance - focal_length);
+
+    // Image plane values (render -time)
+    float3 sensor = float3(screen * 0.5 * sensor_size , -image_plane);
+    // Lens values (render -time)
+    float theta = 6.28318531 * random.x;
+    float r = aperture * sqrt(random.y);
+    float3 lens = float3(cos(theta) * r, sin(theta) * r, 0.0);
+    // Focal plane values (render -time)
+    float3 focused = sensor * focal_length / (focal_length - image_plane);
+    
+    return CreateRay(lens, normalize(focused - lens));
+}
+
+Ray tilt_shift(float2 screen, float2 random)
+{
+    float3 focus_a = _FocusA;
+    float3 focus_b = _FocusB;
+    float3 focus_c = _FocusC;
+    float focal_length = _FocalLength;
+    float f_stop = _FStop;
+    float3 middle = _Middle;
+    float sensor_size = _SensorSize;
+
+    // 1) Compute plane normal
+    float3 normal = normalize( cross( focus_b - focus_a, focus_c - focus_a ) );
+    // float3 normal = normalize( cross( focus_c - focus_a, focus_b - focus_a ) );
+
+    // 2) Compute tilt
+    float3 tilt = float3(0,0,0);
+    
+    if (abs(normal.x) > abs(normal.y))
+    {
+        tilt.x = (focus_a.z - focus_b.z) * focal_length
+               / ( focus_a.z * focus_b.x - focus_b.z * focus_a.x
+                 + (focus_a.z * focus_b.y - focus_b.z * focus_a.y) * (normal.y / normal.x) );
+        tilt.y = tilt.x * (normal.y / normal.x);
+    }
+    else if (abs(normal.y) > 0.0)
+    {
+        tilt.y = (focus_a.z - focus_b.z) * focal_length
+               / ( focus_a.z * focus_b.y - focus_b.z * focus_a.y
+                 + (focus_a.z * focus_b.x - focus_b.z * focus_a.x) * (normal.x / normal.y) );
+        tilt.x = tilt.y * (normal.x / normal.y);
+    }
+
+    tilt.z = sqrt(1.0f - tilt.x*tilt.x - tilt.y*tilt.y);
+
+    // 3) Create an orthonormal basis around the tilt
+    float3 basis_u = normalize(cross(tilt, (abs(tilt.x) > abs(tilt.y)) 
+        ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0)));
+    float3 basis_v = cross(tilt, basis_u);
+
+    // 4) Aperture
+    float aperture = focal_length / f_stop;
+
+    // 5) Focal plane
+    float image_plane = focus_a.z * focal_length / ( dot(focus_a, tilt) - focal_length );
+    float2 shift = (middle.xy / middle.z) * -image_plane; 
+
+    // 6) Move sensor point
+    //    (Note: ‘sensor_size’ is presumably scalar in your snippet, 
+    //     but if you have separate x/y sizes, you might store float2.)
+    float3 sensor = float3( screen * 0.5f * sensor_size + shift, -image_plane );
+
+    // 7) Jitter the lens with your random
+    float theta = 6.28318531f * random.x;
+    float r = 0.5f * aperture * sqrt(random.y);
+    float3 lens = (cos(theta) * basis_u + sin(theta) * basis_v) * r;
+    float4 lens4 = float4(lens, 1.0f);
+    float3 origin = mul(_CameraToWorld, lens4).xyz;
+
+    // 8) Focus
+    float3 focused = sensor * (focal_length / (focal_length + dot(sensor, tilt)));
+    float flip = sign(dot(tilt, focused));
+    // float flip = 1.0f;
+
+    float3 tilt_direction = normalize(focused - lens) * flip;
+
+    // float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
+    // // Transform the direction from camera to world space and normalize
+    float3 direction = mul(_CameraToWorld, float4(tilt_direction, 0.0f)).xyz;
+    direction = normalize(direction);
+
+    // 9) Final out parameters
+    return CreateRay(origin, direction);
+}
+
+void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
+{
+    // Calculate distance along the ray where the sphere is intersected
+    float3 d = ray.origin - sphere.xyz;
+    float p1 = -dot(ray.direction, d);
+    float p2sqr = p1 * p1 - dot(d, d) + sphere.w * sphere.w;
+
+    if (p2sqr < 0)
+        return;
+
+    float p2 = sqrt(p2sqr);
+    float t = p1 - p2 > 0 ? p1 - p2 : p1 + p2;
+
+    if (t > 0 && t < bestHit.distance)
+    {
+        bestHit.distance = t;
+        bestHit.position = ray.origin + t * ray.direction;
+        bestHit.normal = normalize(bestHit.position - sphere.xyz);
+    }
+}
+
+// Find the closest object a ray intersects
+RayHit Trace(Ray ray) {
+    RayHit bestHit = CreateRayHit();
+
+    // Add a floating unit sphere
+    // IntersectSphere(ray, bestHit, float4( 0.75,  0.5,   0.25, 0.2));
+    // IntersectSphere(ray, bestHit, float4(-0.5,  -0.25,  0.75, 0.2));
+    // IntersectSphere(ray, bestHit, float4( 0.25, -0.75, -0.5,  0.2));
+
+    // IntersectSphere(ray, bestHit, float4( 0.0, 1.73, 1, 0.2));
+    // IntersectSphere(ray, bestHit, float4(-1.0, 0.0,  1, 0.2));
+    // IntersectSphere(ray, bestHit, float4( 1.0, 0.0,  1, 0.2));
+
+    IntersectSphere(ray, bestHit, float4( _FocusA.xyz, 0.2));
+    IntersectSphere(ray, bestHit, float4( _FocusB.xyz, 0.2));
+    IntersectSphere(ray, bestHit, float4( _FocusC.xyz, 0.2));
+
+    
+
+    return bestHit;
+}
+
+float3 Shade(inout Ray ray, RayHit hit)
+{
+    if (hit.distance < 1.#INF)
+    {
+        // Return the normal
+        return hit.normal * 0.5f + 0.5f;
+    }
+    else
+    {
+        // Sample the skybox and write it
+        float theta = acos(ray.direction.y) / -PI;
+        float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
+        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
+    }
+}
+
+Ray CreateCameraRay(float2 uv)
+{
+    // Transform the camera origin to world space
+    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    
+    // Invert the perspective projection of the view-space position
+    float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
+    // Transform the direction from camera to world space and normalize
+    direction = mul(_CameraToWorld, float4(direction, 0.0f)).xyz;
+    direction = normalize(direction);
+    return CreateRay(origin, direction);
+}
+
+// Simple "hash" based random for a given 2D integer seed
+float2 GenerateRandom(uint2 seed)
+{
+    // Permute the seed into a single uint
+    uint n = seed.x * 1973u + seed.y * 9277u;
+    n = (n << 13) ^ n; // a little shuffle
+
+    // Convert to float in [0,1]
+    float random0 = 0.5f + float(n * (n * n * 15731u + 789221u + 1376312589u));
+    random0 = frac(random0 * (1.0 / 2147483648.0)); // 2^31
+
+    // Shuffle again for a second random value
+    n ^= (n << 9);
+    float random1 = 0.5f + float(n * (n * n * 11467u + 12345u + 9654321u));
+    random1 = frac(random1 * (1.0 / 2147483648.0));
+
+    return float2(random0, random1);
+}
+
+[numthreads(8,8,1)]
+
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // Get the dimensions of the RenderTexture
+    uint width, height;
+    Result.GetDimensions(width, height);
+    // Transform pixel to [-1,1] range
+    float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
+    // Get a ray for the UVs
+    // Ray ray = CreateCameraRay(uv);
+
+    float3 origin, direction;
+    float2 screenCoord = uv * 2.0f - 1.0f;
+    uint2 pixelSeed = id.xy + uint2(_FrameCount * 1337, _FrameCount * 1337);
+    float2 rand2D = GenerateRandom(pixelSeed);
+    // float2 rand2D = {0, 0};
+    // Ray ray = tilt_shift(screenCoord, rand2D);
+    // float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    Ray ray = thin_lens(screenCoord, rand2D);
+    // ray.origin += mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    // ray.direction = normalize(mul(_CameraToWorld, float4(ray.direction, 0.0f)).xyz);
+    
+    ray.origin = mul(_WorldToCamera, float4(ray.origin.xyz, 1.0f)).xyz;
+    ray.direction = normalize(mul(_WorldToCamera, float4(ray.direction, 0.0f)).xyz);
+
+    // color background based on ray direction
+    // Result[id.xy] = float4(ray.direction * 0.5f + 0.5f, 1.0f);
+
+    // Trace and shade
+    RayHit hit = Trace(ray);
+    float3 result = Shade(ray, hit);
+    Result[id.xy] = float4(result, 1);
+}
+
+// void CSMain (uint3 id : SV_DispatchThreadID)
+// {
+//     // Compute screen coords
+//     float2 pixel = dispatchThreadID.xy;
+//     float2 uv = (pixel + 0.5) / float2(_RenderWidth, _RenderHeight); // [0..1]
+//     float2 screenCoord = uv * 2.0f - 1.0f;                           // [-1..1]
+
+//     // Some random for the lens sampling
+//     float2 rand2D = GenerateRandom(dispatchThreadID.xy);
+
+//     // Call tilt_shift
+//     float3 origin, direction;
+//     tilt_shift(screenCoord, rand2D, origin, direction);
+
+//     // color background based on ray direction
+//     // Result[id.xy] = float4(ray.direction * 0.5f + 0.5f, 1.0f);
+
+//     // Trace and shade
+//     RayHit hit = Trace(ray);
+//     float3 result = Shade(ray, hit);
+//     Result[id.xy] = float4(result, 1);
+// }
