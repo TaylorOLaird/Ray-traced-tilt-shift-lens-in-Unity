@@ -1,35 +1,24 @@
 using UnityEngine;
 
-public class RayTracingMain : MonoBehaviour
+public class NewNewMain : MonoBehaviour
 {
     public ComputeShader RayTracingShader;
-
     private RenderTexture _target;
-
     private Camera _camera;
-
     public Texture SkyboxTexture;
 
-    [SerializeField] Vector3 focus_a = new Vector3(0.0f, 0.0f, 1.0f);
-    [SerializeField] Vector3 focus_b = new Vector3(0.0f, 1.0f, 0.0f);
-    [SerializeField] Vector3 focus_c = new Vector3(1.0f, 0.0f, 0.0f);
-    [SerializeField] float focal_length = 0.25f;
-    [SerializeField] float f_stop = 1.0f;
-    [SerializeField] Vector3 middle = new Vector3(0.0f, 0.0f, 1.0f);
-    [SerializeField] float sensor_size = 1.0f;
-    [SerializeField] float s = 1.0f;
+    public GameObject RedSphere;
+    public GameObject GreenSphere;
+    public GameObject BlueSphere;
 
-    // float3 _FocusA;
-    
-    // float3 _FocusB;
-    // float3 _FocusC;
-    // float _FocalLength;
-    // float _FStop;
-    // float3 _Middle;
-    // float _SensorSize;
+    public float DefocusAngle = 0.0f;
+    public float FocusDist = 10.0f;
+
+    private float _Random = 0.0f;
 
     private void Awake()
     {
+        _Random = Random.Range(0.0f, 1.0f);
         _camera = GetComponent<Camera>();
     }
 
@@ -38,26 +27,22 @@ public class RayTracingMain : MonoBehaviour
         RayTracingShader.SetMatrix("_CameraToWorld", _camera.cameraToWorldMatrix);
         RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
         RayTracingShader.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
-        int frameCount = Time.frameCount; // or keep your own counter
-        RayTracingShader.SetInt("_FrameCount", frameCount);
 
-        RayTracingShader.SetVector("_FocusA", focus_a);
-        RayTracingShader.SetVector("_FocusB", focus_b);
-        RayTracingShader.SetVector("_FocusC", focus_c);
-        RayTracingShader.SetFloat("_FocalLength", focal_length);
-        RayTracingShader.SetFloat("_FStop", f_stop);
-        RayTracingShader.SetVector("_Middle", middle);
-        RayTracingShader.SetFloat("_SensorSize", sensor_size);
-        RayTracingShader.SetFloat("_S", s);
+        // store the sphere centers and scale as a vector4
+        RayTracingShader.SetVector("_RedSphere",   new Vector4(RedSphere.transform.position.x,   RedSphere.transform.position.y,   RedSphere.transform.position.z,   RedSphere.transform.localScale.x / 2.0f));
+        RayTracingShader.SetVector("_GreenSphere", new Vector4(GreenSphere.transform.position.x, GreenSphere.transform.position.y, GreenSphere.transform.position.z, GreenSphere.transform.localScale.x  / 2.0f));
+        RayTracingShader.SetVector("_BlueSphere",  new Vector4(BlueSphere.transform.position.x,  BlueSphere.transform.position.y,  BlueSphere.transform.position.z,  BlueSphere.transform.localScale.x  / 2.0f));
 
+        RayTracingShader.SetFloat("_DefocusAngle", DefocusAngle);
+        RayTracingShader.SetFloat("_FocusDist", FocusDist);
+
+        RayTracingShader.SetFloat("_Random", _Random);
     }
-
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         SetShaderParameters();
         Render(destination);
-
     }
 
     private void Render(RenderTexture destination)
@@ -84,8 +69,7 @@ public class RayTracingMain : MonoBehaviour
                 _target.Release();
 
             // Get a render target for Ray Tracing
-            _target = new RenderTexture(Screen.width, Screen.height, 0,
-                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            _target = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             _target.enableRandomWrite = true;
             _target.Create();
         }
