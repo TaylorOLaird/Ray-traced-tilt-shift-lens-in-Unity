@@ -11,14 +11,13 @@ public class NewNewMain : MonoBehaviour
     public GameObject GreenSphere;
     public GameObject BlueSphere;
 
-    public float DefocusAngle = 0.0f;
-    public float FocusDist = 10.0f;
+    public float _DefocusRadius = 1.0f;
+    public float _FocusDistance = 1.0f;
 
-    private float _Random = 0.0f;
+    public bool _ShowPlaneDebug = true;
 
     private void Awake()
     {
-        _Random = Random.Range(0.0f, 1.0f);
         _camera = GetComponent<Camera>();
     }
 
@@ -33,10 +32,8 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetVector("_GreenSphere", new Vector4(GreenSphere.transform.position.x, GreenSphere.transform.position.y, GreenSphere.transform.position.z, GreenSphere.transform.localScale.x  / 2.0f));
         RayTracingShader.SetVector("_BlueSphere",  new Vector4(BlueSphere.transform.position.x,  BlueSphere.transform.position.y,  BlueSphere.transform.position.z,  BlueSphere.transform.localScale.x  / 2.0f));
 
-        RayTracingShader.SetFloat("_DefocusAngle", DefocusAngle);
-        RayTracingShader.SetFloat("_FocusDist", FocusDist);
-
-        RayTracingShader.SetFloat("_Random", _Random);
+        RayTracingShader.SetFloat("_DefocusRadius", _DefocusRadius);
+        RayTracingShader.SetFloat("_FocusDistance", _FocusDistance);
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)

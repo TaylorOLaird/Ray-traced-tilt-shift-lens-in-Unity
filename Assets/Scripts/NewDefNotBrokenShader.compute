@@ -10,13 +10,8 @@ float4 _RedSphere;
 float4 _GreenSphere;
 float4 _BlueSphere;
 
-float _DefocusAngle;
-float _FocusDist;
-
-float _Random;
-
-float3 defocus_disk_u;
-float3 defocus_disk_v;
+float _DefocusRadius;
+float _FocusDistance;
 
 static const float PI = 3.14159265f;
 
@@ -33,49 +28,10 @@ struct RayHit
     float3 normal;
 };
 
-// float3 random_in_unit_disk()
-// {
-//     // Returns a random point in the unit disk.
-//     float3 p = float3(0.0f, 0.0f, 0.0f);
-//     while (true)
-//     {
-//         p.x = random_float(-1.0f, 1.0f);
-//         p.y = random_float(-1.0f, 1.0f);
-//         if (dot(p, p) < 1.0f)
-//             break;
-//     }
-//     return p;
-// }
-
-// inline vec3 random_in_unit_disk() {
-//     while (true) {
-//         auto p = vec3(random_double(-1,1), random_double(-1,1), 0);
-//         if (p.length_squared() < 1)
-//             return p;
-//     }
-// }
-
-float3 defocus_disk_sample()
-{
-    // Returns a random point in the camera defocus disk.
-    float3 p = _Random;
-    return defocus_disk_u * p.x + defocus_disk_v * p.y;
-}
-
 Ray NewRay(float3 origin, float3 direction)
 {
     Ray ray;
-    // auto ray_origin = (defocus_angle <= 0) ? center : defocus_disk_sample();
-    // ray.origin = origin;
-    if (_DefocusAngle > 0.0f)
-    {
-        ray.origin = defocus_disk_sample() + origin;
-    }
-    else
-    {
-        ray.origin = origin;
-    }
-
+    ray.origin = origin;
     ray.direction = direction;
     return ray;
 }
@@ -135,30 +91,57 @@ float3 Shade(inout Ray ray, RayHit hit)
     }
 }
 
-Ray CreateThinLensRay(float2 uv)
+float2 grid_to_disc(float x, float y)
 {
-    float u = uv.x;
-    float v = uv.y;
-    // Transform the camera origin to world space
-    float3 origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-    
-    // Invert the perspective projection of the view-space position
-    float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
-    // Transform the direction from camera to world space and normalize
-    direction = mul(_CameraToWorld, float4(direction, 0.0f)).xyz;
-    direction = normalize(direction);
-    
-    // Apply thin lens distortion
-    // // Calculate the camera defocus disk basis vectors.
-    // auto defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
-    // defocus_disk_u = u * defocus_radius;
-    // defocus_disk_v = v * defocus_radius;
+    float r, phi;
+    float2 translated_coords = float2(0.0f, 0.0f);
+    if (x * x > y * y) {
+        r = x;
+        phi = (PI * y) / (4.0f * x);
+    } else {
+        r = y;
+        phi = (PI / 2.0f) - (PI / 4.0f) * (x / y);
+    }
 
-    float defocus_radius = _FocusDist * tan(radians(_DefocusAngle / 2.0f));
-    defocus_disk_u = u * defocus_radius;
-    defocus_disk_v = v * defocus_radius;
+    return float2(r * cos(phi), r * sin(phi));
+}
+
+float4 CalculateThinLensRayResult(float2 uv)
+{
+    float3 result = float3(0.0f, 0.0f, 0.0f);
+    // Ray tmpRay;
+
+    // get camera origin and direction from unity scene
+    float3 camera_origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+    float3 camera_direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
+    camera_direction = mul(_CameraToWorld, float4(camera_direction, 0.0f)).xyz;
+    camera_direction = normalize(camera_direction);
+
+    float3 focal_point = camera_origin + camera_direction * _FocusDistance;
+
+    float samples = 0.0f;
+
+    // loop over a grid of points in the lens plane to shoot rays through the lens
+    for (float i = -0.5f * _DefocusRadius; i <= 0.5f * _DefocusRadius; i += 0.1f)
+    {
+        for (float j = -0.5f * _DefocusRadius; j <= 0.5f * _DefocusRadius; j += 0.1f)
+        {
+            float3 lens_ray_origin = float3(grid_to_disc(i, j), 0.0f);
+            lens_ray_origin += camera_origin;
+            float3 lens_ray_direction = normalize(focal_point - lens_ray_origin);
+
+            Ray ray = NewRay(lens_ray_origin, lens_ray_direction);
+            RayHit hit = Trace(ray);
+            float3 color = Shade(ray, hit);
+
+            result += color;
+            samples += 1.0f;
+        }
+    }
+
+    result /= samples;
     
-    return NewRay(origin, direction);
+    return float4(result, 1);
 }
 
 Ray CreateCameraRay(float2 uv)
@@ -168,10 +151,20 @@ Ray CreateCameraRay(float2 uv)
     
     // Invert the perspective projection of the view-space position
     float3 direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
+
     // Transform the direction from camera to world space and normalize
     direction = mul(_CameraToWorld, float4(direction, 0.0f)).xyz;
     direction = normalize(direction);
+
     return NewRay(origin, direction);
+}
+
+float4 CalculateCameraRayResult(float2 uv)
+{
+    Ray ray = CreateCameraRay(uv);
+    RayHit hit = Trace(ray);
+    float3 result = Shade(ray, hit);
+    return float4(result, 1);
 }
 
 [numthreads(8,8,1)]
@@ -183,20 +176,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     
     // Transform pixel to [-1,1] range
     float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
-    
-    // Get a ray for the UVs
-    Ray ray = CreateCameraRay(uv);
 
-    // Write some colors
-    // Result[id.xy] = float4(ray.direction * 0.5f + 0.5f, 1.0f);
+    // Result[id.xy] = CalculateCameraRayResult(uv);
+    Result[id.xy] = CalculateThinLensRayResult(uv);
 
-    // Sample the skybox and write it
-    // float theta = acos(ray.direction.y) / -PI;
-    // float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
-    // Result[id.xy] = _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0);
-
-    // Trace and shade
-    RayHit hit = Trace(ray);
-    float3 result = Shade(ray, hit);
-    Result[id.xy] = float4(result, 1);
 }
