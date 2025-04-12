@@ -11,6 +11,17 @@ public class NewNewMain : MonoBehaviour
     public GameObject GreenSphere;
     public GameObject BlueSphere;
 
+    enum CameraMode
+    {
+        Pinhole,
+        PinholeWithAntialiasing,
+        ThinLens,
+        TiltShift,
+    };
+
+    [SerializeField]
+    private CameraMode _cameraMode = CameraMode.Pinhole;
+
     public float _DefocusRadius = 1.0f;
     public float _FocusDistance = 1.0f;
 
@@ -28,12 +39,14 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
 
         // store the sphere centers and scale as a vector4
-        RayTracingShader.SetVector("_RedSphere",   new Vector4(RedSphere.transform.position.x,   RedSphere.transform.position.y,   RedSphere.transform.position.z,   RedSphere.transform.localScale.x / 2.0f));
-        RayTracingShader.SetVector("_GreenSphere", new Vector4(GreenSphere.transform.position.x, GreenSphere.transform.position.y, GreenSphere.transform.position.z, GreenSphere.transform.localScale.x  / 2.0f));
-        RayTracingShader.SetVector("_BlueSphere",  new Vector4(BlueSphere.transform.position.x,  BlueSphere.transform.position.y,  BlueSphere.transform.position.z,  BlueSphere.transform.localScale.x  / 2.0f));
+        RayTracingShader.SetVector("_RedSphere", new Vector4(RedSphere.transform.position.x, RedSphere.transform.position.y, RedSphere.transform.position.z, RedSphere.transform.localScale.x / 2.0f));
+        RayTracingShader.SetVector("_GreenSphere", new Vector4(GreenSphere.transform.position.x, GreenSphere.transform.position.y, GreenSphere.transform.position.z, GreenSphere.transform.localScale.x / 2.0f));
+        RayTracingShader.SetVector("_BlueSphere", new Vector4(BlueSphere.transform.position.x, BlueSphere.transform.position.y, BlueSphere.transform.position.z, BlueSphere.transform.localScale.x / 2.0f));
 
         RayTracingShader.SetFloat("_DefocusRadius", _DefocusRadius);
         RayTracingShader.SetFloat("_FocusDistance", _FocusDistance);
+
+        RayTracingShader.SetInt("_CameraMode", (int)_cameraMode);
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)

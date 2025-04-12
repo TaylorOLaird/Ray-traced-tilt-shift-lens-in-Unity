@@ -13,6 +13,9 @@ float4 _BlueSphere;
 float _DefocusRadius;
 float _FocusDistance;
 
+// 0 = pinhole, 1 = pinhole with antialiasing, 2 = thin lens, 3 = tilt shift
+int _CameraMode;
+
 static const float PI = 3.14159265f;
 
 struct Ray
@@ -106,44 +109,6 @@ float2 grid_to_disc(float x, float y)
     return float2(r * cos(phi), r * sin(phi));
 }
 
-float4 CalculateThinLensRayResult(float2 uv)
-{
-    float3 result = float3(0.0f, 0.0f, 0.0f);
-    // Ray tmpRay;
-
-    // get camera origin and direction from unity scene
-    float3 camera_origin = mul(_CameraToWorld, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-    float3 camera_direction = mul(_CameraInverseProjection, float4(uv, 0.0f, 1.0f)).xyz;
-    camera_direction = mul(_CameraToWorld, float4(camera_direction, 0.0f)).xyz;
-    camera_direction = normalize(camera_direction);
-
-    float3 focal_point = camera_origin + camera_direction * _FocusDistance;
-
-    float samples = 0.0f;
-
-    // loop over a grid of points in the lens plane to shoot rays through the lens
-    for (float i = -0.5f * _DefocusRadius; i <= 0.5f * _DefocusRadius; i += 0.1f)
-    {
-        for (float j = -0.5f * _DefocusRadius; j <= 0.5f * _DefocusRadius; j += 0.1f)
-        {
-            float3 lens_ray_origin = float3(grid_to_disc(i, j), 0.0f);
-            lens_ray_origin += camera_origin;
-            float3 lens_ray_direction = normalize(focal_point - lens_ray_origin);
-
-            Ray ray = NewRay(lens_ray_origin, lens_ray_direction);
-            RayHit hit = Trace(ray);
-            float3 color = Shade(ray, hit);
-
-            result += color;
-            samples += 1.0f;
-        }
-    }
-
-    result /= samples;
-    
-    return float4(result, 1);
-}
-
 Ray CreateCameraRay(float2 uv)
 {
     // Transform the camera origin to world space
@@ -159,13 +124,144 @@ Ray CreateCameraRay(float2 uv)
     return NewRay(origin, direction);
 }
 
-float4 CalculateCameraRayResult(float2 uv)
+float4 CalculateAntialiasingRayResult(float2 uv)
 {
-    Ray ray = CreateCameraRay(uv);
-    RayHit hit = Trace(ray);
-    float3 result = Shade(ray, hit);
+    float range = 0.002f;
+    float step = range / 3.5f;
+    float samples = 0.0f;
+    float3 result = float3(0.0f, 0.0f, 0.0f);
+
+    Ray camera_ray = CreateCameraRay(uv);
+
+    for (float i = -range; i <= range; i += step)
+    {
+        for (float j = -range; j <= range; j += step)
+        {
+            float3 jitered_ray_origin = camera_ray.origin;
+            float3 jitered_ray_direction = camera_ray.direction + float3(i, j, 0.0f);
+            jitered_ray_direction = normalize(jitered_ray_direction);
+
+            Ray jitered_ray = NewRay(jitered_ray_origin, jitered_ray_direction);
+            RayHit hit = Trace(jitered_ray);
+            float3 color = Shade(jitered_ray, hit);
+            
+            result += color;
+            samples += 1.0f;
+        }
+    }
+
+    result /= samples;\
     return float4(result, 1);
 }
+
+float4 CalculateThinLensRayResult(float2 uv)
+{
+    float3 result = float3(0.0f, 0.0f, 0.0f);
+    Ray camera_ray = CreateCameraRay(uv);
+    float3 focal_point = camera_ray.origin + camera_ray.direction * _FocusDistance;
+    float samples = 0.0f;
+
+    // Sample the lens disc
+    for (float i = -0.5f * _DefocusRadius; i <= 0.5f * _DefocusRadius; i += 0.1f)
+    {
+        for (float j = -0.5f * _DefocusRadius; j <= 0.5f * _DefocusRadius; j += 0.1f)
+        {
+            float3 lens_ray_origin = float3(grid_to_disc(i, j), 0.0f);
+            lens_ray_origin += camera_ray.origin;
+            float3 lens_ray_direction = normalize(focal_point - lens_ray_origin);
+
+            Ray lens_ray = NewRay(lens_ray_origin, lens_ray_direction);
+            RayHit hit = Trace(lens_ray);
+            float3 color = Shade(lens_ray, hit);
+
+            result += color;
+            samples += 1.0f;
+        }
+    }
+    result /= samples;
+    return float4(result, 1);
+}
+
+float4 CalculateTiltShiftRayResult(float2 uv)
+{
+    float3 result = float3(0.0f, 0.0f, 0.0f);
+    Ray camera_ray = CreateCameraRay(uv);
+    float3 focal_point = camera_ray.origin + camera_ray.direction * _FocusDistance;
+    float samples = 0.0f;
+
+    // Sample the lens disc
+    for (float i = -0.5f * _DefocusRadius; i <= 0.5f * _DefocusRadius; i += 0.1f)
+    {
+        for (float j = -0.5f * _DefocusRadius; j <= 0.5f * _DefocusRadius; j += 0.1f)
+        {
+            float3 lens_ray_origin = float3(grid_to_disc(i, j), 0.0f);
+            lens_ray_origin += camera_ray.origin;
+            float3 lens_ray_direction = normalize(focal_point - lens_ray_origin);
+
+            Ray lens_ray = NewRay(lens_ray_origin, lens_ray_direction);
+            RayHit hit = Trace(lens_ray);
+            float3 color = Shade(lens_ray, hit);
+
+            result += color;
+            samples += 1.0f;
+        }
+    }
+    result /= samples;
+    return float4(result, 1);
+}
+
+// float4 CalculateTiltShiftRayResult(float2 uv)
+// {
+//     // return float4(0.0f, 0.0f, 0.0f, 1.0f);
+
+//     Ray camera_ray = CreateCameraRay(uv);
+//     float3 focal_point = camera_ray.origin + camera_ray.direction * _FocusDistance;
+
+//     // this might instead need to be like the magnitude of the a vectror between
+//     // the camera and the focal point
+//     float focal_length = _FocusDistance;
+
+//     float3 focus_a = _RedSphere.xyz;
+//     float3 focus_b = _GreenSphere.xyz;
+//     float3 focus_c = _BlueSphere.xyz;
+
+//     // Focal plane values (precomputable)
+//     float3 normal = normalize(cross(focus_b - focus_a, focus_c - focus_a));
+    
+//     // Lens values (precomputable)
+//     float3 tilt = float3(0.0f, 0.0f, 0.0f);
+//     if (abs(normal.x) > abs(normal.y))
+//     {
+//         tilt.x = (focus_a.z - focus_b.z) * focal_length /
+//             (focus_a.z * focus_b.x - focus_b.z * focus_a.x +
+//             (focus_a.z * focus_b.y - focus_b.z * focus_a.y) *
+//             normal.y / normal.x);
+
+//         tilt.y = tilt.x * normal.y / normal.x;
+//     }
+//     else if (abs(normal.y) > 0.0)
+//     {
+//         tilt.y = (focus_a.z - focus_b.z) * focal_length /
+//             (focus_a.z * focus_b.y - focus_b.z * focus_a.y +
+//             (focus_a.z * focus_b.x - focus_b.z * focus_a.x) *
+//             normal.x / normal.y);
+
+//         tilt.x = tilt.y * normal.x / normal.y;
+//     }
+//     tilt.z = sqrt(1.0 - tilt.x * tilt.x - tilt.y * tilt.y);
+
+//     float3 basis_u = normalize(cross(tilt, abs(tilt.x) > abs(tilt.y) ? 
+//         float3(0.0, 1.0, 0.0) : 
+//         float3(1.0, 0.0, 0.0)));
+
+//     float3 basis_v = cross(tilt, basis_u);
+//     float aperture = _DefocusRadius;
+
+//     float image_plane = focus_a.z * focal_length /
+//         (dot(focus_a , tilt) - focal_length);
+
+//     return float4(0.0f, 0.0f, 0.0f, 1.0f);
+// }
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
@@ -177,7 +273,22 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     // Transform pixel to [-1,1] range
     float2 uv = float2((id.xy + float2(0.5f, 0.5f)) / float2(width, height) * 2.0f - 1.0f);
 
-    // Result[id.xy] = CalculateCameraRayResult(uv);
-    Result[id.xy] = CalculateThinLensRayResult(uv);
-
+    if (_CameraMode == 0)
+    {
+        Ray ray = CreateCameraRay(uv);
+        RayHit hit = Trace(ray);
+        Result[id.xy] = float4(Shade(ray, hit).xyz, 1.0f);
+    }
+    else if (_CameraMode == 1)
+    {
+        Result[id.xy] = CalculateAntialiasingRayResult(uv);
+    }
+    else if (_CameraMode == 2)
+    {
+        Result[id.xy] = CalculateThinLensRayResult(uv);
+    }
+    else if (_CameraMode == 3)
+    {
+        Result[id.xy] = CalculateTiltShiftRayResult(uv);
+    }
 }
