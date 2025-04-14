@@ -11,7 +11,7 @@ public class PlaneScript : MonoBehaviour
     {
         // search children for the plane object
         _Plane = transform.Find("Plane").gameObject;
-        
+
     }
 
     // Update is called once per frame
@@ -32,10 +32,17 @@ public class PlaneScript : MonoBehaviour
         transform.rotation = rayTracingScript.transform.rotation;
 
         // also adjust the plane scale based on _focusDistance
-        float scale_factor = rayTracingScript._FocusDistance / 4.0f;
-        _Plane.transform.localScale = new Vector3(scale_factor, scale_factor, scale_factor);
+        float scale_factor = 20.0f * (rayTracingScript._FocusDistance / 4.0f) * (rayTracingScript._DefocusRadius);
+        _Plane.transform.localScale = new Vector3(scale_factor, 0.002f, scale_factor);
 
         // move the plane in the positive z direction by _FocusDistance
         transform.position += rayTracingScript._FocusDistance * rayTracingScript.transform.forward;
+
+        float tiltX = rayTracingScript._XTilt;
+        float tiltY = rayTracingScript._YTilt;
+
+        // add the tilts to the plane rotations
+        transform.rotation *= Quaternion.Euler(tiltX, tiltY, 0.0f);
+
     }
 }

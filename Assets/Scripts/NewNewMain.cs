@@ -22,10 +22,21 @@ public class NewNewMain : MonoBehaviour
     [SerializeField]
     private CameraMode _cameraMode = CameraMode.Pinhole;
 
-    public float _DefocusRadius = 1.0f;
-    public float _FocusDistance = 1.0f;
+    [Range(-45.0f, 45.0f)]
+    public float _XTilt = 0.0f;
+    [Range(-45.0f, 45.0f)]
+    public float _YTilt = 0.0f;
+
+    public float _XTiltNormalized = 0.0f;
+    public float _YTiltNormalized = 0.0f;
 
     public bool _ShowPlaneDebug = true;
+    [Range(0.01f, 1.0f)]
+    public float _DefocusRadius = 0.0f;
+    [Range(1.0f, 10.0f)]
+    public float _FocusDistance = 4.0f;
+    // public float _DefocusRadius = 1.0f;
+    // public float _FocusDistance = 1.0f;
 
     private void Awake()
     {
@@ -47,6 +58,12 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetFloat("_FocusDistance", _FocusDistance);
 
         RayTracingShader.SetInt("_CameraMode", (int)_cameraMode);
+
+        RayTracingShader.SetFloat("_XTilt", _XTilt);
+        RayTracingShader.SetFloat("_YTilt", _YTilt);
+
+        _XTiltNormalized = _XTilt / 45.0f;
+        _YTiltNormalized = _YTilt / 45.0f;
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
