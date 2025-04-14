@@ -31,7 +31,7 @@ public class NewNewMain : MonoBehaviour
     public float _YTiltNormalized = 0.0f;
 
     public bool _ShowPlaneDebug = true;
-    [Range(0.01f, 1.0f)]
+    [Range(0.01f, 3.0f)]
     public float _DefocusRadius = 0.0f;
     [Range(1.0f, 10.0f)]
     public float _FocusDistance = 4.0f;

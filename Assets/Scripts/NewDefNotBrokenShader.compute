@@ -13,6 +13,9 @@ float4 _BlueSphere;
 float _DefocusRadius;
 float _FocusDistance;
 
+float _XTilt;
+float _YTilt;
+
 // 0 = pinhole, 1 = pinhole with antialiasing, 2 = thin lens, 3 = tilt shift
 int _CameraMode;
 
@@ -184,38 +187,64 @@ float4 CalculateThinLensRayResult(float2 uv)
 
 float4 CalculateTiltShiftRayResult(float2 uv)
 {
-    float _XTiltNormalized = _RedSphere.x / 45.0f;
-    float _YTiltNormalized = _RedSphere.y / 45.0f;
+    float _XTiltNormalized = _XTilt / 45.0f;
+    float _YTiltNormalized = _YTilt / 45.0f;
     
     Ray camera_ray = CreateCameraRay(uv);
 
-    float tilt_focal_length_factor;
-    // top left corner
-    if uv.y < 0.0f && uv.x < 0.0f
-    {
-        float closeness_to_top = abs(uv.y);
-        float closeness_to_left = abs(uv.x);
+    float y_tilt_focal_length_adjust = 1.0f;
 
-        float abs_x_tilt = abs(_XTiltNormalized);
-        float abs_y_tilt = abs(_YTiltNormalized);
+    // y tilt (left side of plane is closer to camera)
+    // if (_YTiltNormalized <= 0.0f)
+    // {
+    //     // when uv.y is negative, we want to move the focal point closer to the camera
+    //     if (uv.x > 0.0f)
+    //     {
+    //         // y_tilt_focal_length_adjust = 1.0f - abs(_YTiltNormalized);
+    //     }
+    //     // when uv.y is positive, we want to move the focal point away from the camera
+    //     else if (uv.x < 0.0f)
+    //     {
+    //         y_tilt_focal_length_adjust = 1.0f + abs(_YTiltNormalized);
+    //     }
+    // }
 
-        float x_tilt_factor = (closeness_to_top + abs_x_tilt) / 2.0f;
-        float y_tilt_factor = (closeness_to_left + abs_y_tilt) / 2.0f;
-    }
-    // top right corner
-    else if uv.y < 0.0f && uv.x > 0.0f
+    // left side of screen
+    if (uv.x < 0.0f)
     {
+        // and the left side of the plane is closer to the camera
+        if (_YTiltNormalized <= 0.0f)
+            _FocusDistance = _FocusDistance * 0.9f;
+        if (_YTiltNormalized > 0.0f)
+            _FocusDistance = _FocusDistance * 1.1f;
     }
-    // bottom left corner
-    else if uv.y > 0.0f && uv.x < 0.0f
+    // right side of screen
+    else if (uv.x > 0.0f)
     {
+        // and the left side of the plane is closer to the camera
+        if (_YTiltNormalized <= 0.0f)
+            _FocusDistance = _FocusDistance * 1.1f;
+        if (_YTiltNormalized > 0.0f)
+            _FocusDistance = _FocusDistance * 0.9f;
     }
-    // bottom right corner
-    else if uv.y > 0.0f && uv.x > 0.0f
-    {
-    }
+    
 
-    float3 focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance * tilt_focal_length_factor);
+    // y tilt (right side of plane is closer to camera)
+    // else if (_YTiltNormalized > 0.0f)
+    // {
+    //     // when uv.y is negative, we want to move the focal point away from the camera
+    //     if (uv.x < 0.0f)
+    //     {
+    //         y_tilt_focal_length_adjust = 1.0f + abs(_YTiltNormalized);
+    //     }
+    //     // when uv.y is positive, we want to move the focal point closer to the camera
+    //     else if (uv.x > 0.0f)
+    //     {
+    //         y_tilt_focal_length_adjust = 1.0f - abs(_YTiltNormalized);
+    //     }
+    // }
+
+    float3 focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance);
     
     float3 result = float3(0.0f, 0.0f, 0.0f);
     float samples = 0.0f;

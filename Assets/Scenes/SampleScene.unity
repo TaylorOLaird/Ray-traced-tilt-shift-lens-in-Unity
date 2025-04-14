@@ -433,10 +433,12 @@ MonoBehaviour:
   RedSphere: {fileID: 130835859}
   GreenSphere: {fileID: 345036102}
   BlueSphere: {fileID: 2124765832}
-  _cameraMode: 3
+  _cameraMode: 0
   _XTilt: 0
   _YTilt: 0
-  _ShowPlaneDebug: 1
+  _XTiltNormalized: 0
+  _YTiltNormalized: 0
+  _ShowPlaneDebug: 0
   _DefocusRadius: 0.5
   _FocusDistance: 4
 --- !u!1 &705507993
