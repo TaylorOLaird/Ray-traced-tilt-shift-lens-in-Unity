@@ -11,6 +11,9 @@ public class NewNewMain : MonoBehaviour
     public GameObject GreenSphere;
     public GameObject BlueSphere;
 
+    public Transform PlaneOrigin;
+    public Transform PlaneNormalRef;
+
     enum CameraMode
     {
         Pinhole,
@@ -29,6 +32,8 @@ public class NewNewMain : MonoBehaviour
 
     public float _XTiltNormalized = 0.0f;
     public float _YTiltNormalized = 0.0f;
+
+    public Vector3 _PlaneNormal = Vector3.zero;
 
     public bool _ShowPlaneDebug = true;
     [Range(0.01f, 3.0f)]
@@ -62,8 +67,17 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetFloat("_XTilt", _XTilt);
         RayTracingShader.SetFloat("_YTilt", _YTilt);
 
+        RayTracingShader.SetFloat("_PlaneNormalX", _PlaneNormal.x);
+        RayTracingShader.SetFloat("_PlaneNormalY", _PlaneNormal.y);
+        RayTracingShader.SetFloat("_PlaneNormalZ", _PlaneNormal.z);
+
+        RayTracingShader.SetFloat("_PlaneOriginX", PlaneOrigin.position.x);
+        RayTracingShader.SetFloat("_PlaneOriginY", PlaneOrigin.position.y);
+        RayTracingShader.SetFloat("_PlaneOriginZ", PlaneOrigin.position.z);
+
         _XTiltNormalized = _XTilt / 45.0f;
         _YTiltNormalized = _YTilt / 45.0f;
+        _PlaneNormal = PlaneNormalRef.position - PlaneOrigin.position;
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
