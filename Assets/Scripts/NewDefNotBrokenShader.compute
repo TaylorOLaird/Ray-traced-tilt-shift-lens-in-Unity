@@ -79,24 +79,8 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
     bestHit.normal = normalize(bestHit.position - sphere.xyz);
 }
 
-// void intersectPlane(Ray ray, inout RayHit bestHit, float3 p0)
-// {
-//     float3 n = normalize(float3(_PlaneNormalX, _PlaneNormalY, _PlaneNormalZ));
-//     // Assuming vectors are all normalized
-//     float denom = dot(n, ray.direction);
-//     if (denom > 1e-6) {
-//         float t = dot(p0 - ray.origin, n) / denom; 
-//         if (t < 0.0f || t > bestHit.distance)
-//             return;
-        
-//         bestHit.distance = t;
-//         bestHit.position = ray.origin + t * ray.direction;
-//         bestHit.normal = n;
-//     }
-// }
-
 // bool intersectPlane(const Vec3f &n, const Vec3f &p0, const Vec3f &l0, const Vec3f &l, float &t)
-void intersectPlane(Ray ray, inout RayHit bestHit)
+float intersectPlane(Ray ray)
 {
     float3 n = normalize(float3(_PlaneNormalX, _PlaneNormalY, _PlaneNormalZ));
     float3 p0 = float3(_PlaneOriginX, _PlaneOriginY, _PlaneOriginZ);
@@ -104,19 +88,8 @@ void intersectPlane(Ray ray, inout RayHit bestHit)
     float3 l = ray.direction;
     float t = 0.0f;
 
-    // Assuming vectors are all normalized
-    float denom = dot(n, l);
-    if (denom > 1e-6) {
-        float3 p0l0 = p0 - l0;
-        t = dot(p0l0, n) / denom;
-
-        if (t < 0.0f || t > bestHit.distance)
-            return;
-
-        bestHit.distance = t;
-        bestHit.position = l0 + t * l;
-        bestHit.normal = n;
-    }
+    t = dot(l0 - p0, n) / dot(n, l);
+    return -t;
 }
 
 RayHit Trace(Ray ray)
@@ -141,7 +114,7 @@ float3 Shade(inout Ray ray, RayHit hit)
         // Sample the skybox and write it
         float theta = acos(ray.direction.y) / -PI;
         float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
-        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
+        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi + 1, theta), 0).xyz;
     }
 }
 
@@ -201,7 +174,7 @@ float4 CalculateAntialiasingRayResult(float2 uv)
         }
     }
 
-    result /= samples;\
+    result /= samples;
     return float4(result, 1);
 }
 
@@ -233,107 +206,15 @@ float4 CalculateThinLensRayResult(float2 uv)
     return float4(result, 1);
 }
 
-// float intersectPlane(float3 n, float3 p0, float3 l0, float3 l)
-// {
-//     // Assuming vectors are all normalized
-//     float denom = dotProduct(n, l);
-//     float t = 0.0f;
-//     if (denom > 1e-6) {
-//         float3 p0l0 = p0 - l0;
-//         t = dotProduct(p0 - l0, n) / dotProduct(n, l); 
-//         return t;
-//     }
-
-//     return 0.0f;
-// }
-
 float4 CalculateTiltShiftRayResult(float2 uv)
 {
     float _XTiltNormalized = _XTilt / 45.0f;
     float _YTiltNormalized = _YTilt / 45.0f;
-
-    // float tilt_x = _XTiltNormalized * 0.5f + 1.0f;
-    // float tilt_y = _YTiltNormalized * 0.5f + 1.0f;
-
-    // float3 focal_point = camera_ray.origin + camera_ray.direction * _FocusDistance;
-    float3 focal_point;
     
     Ray camera_ray = CreateCameraRay(uv);
+    float focal_plane_distance = intersectPlane(camera_ray);
 
-    // float top_left    = ((1.0f * _XTiltNormalized * -1.0f) + (1.0f * _YTiltNormalized * -1.0f))/2.0f;
-    // float top_right   = ((1.0f * _XTiltNormalized * -1.0f) + (1.0f * _YTiltNormalized))/2.0f;
-    // float botom_left  = ((1.0f * _XTiltNormalized) + (1.0f * _YTiltNormalized * -1.0f))/2.0f;
-    // float botom_right = ((1.0f * _XTiltNormalized) + (1.0f * _YTiltNormalized))/2.0f;
-
-    // top_left    = max(top_left, 0.0f);
-    // top_right   = max(top_right, 0.0f);
-    // botom_left  = max(botom_left, 0.0f);
-    // botom_right = max(botom_right, 0.0f);
-
-    // left
-    // if (uv.x <0.0f)
-    // {
-    //     // top left
-    //     if (uv.y > 0.0f)
-    //     {
-    //         focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance * (1 + top_left));
-    //     }
-    //     // botom left
-    //     else
-    //     {
-    //         focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance * (1 + botom_left));
-    //     }
-    // }
-    // // right
-    // else
-    // {
-    //     // top right
-    //     if (uv.y > 0.0f)
-    //     {
-    //         focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance * (1 + top_right));
-    //     }
-    //     // bottom right
-    //     else
-    //     {
-    //         focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance * (1 + botom_right));
-    //     }
-    // }
-
-    // focal_point = camera_ray.origin + camera_ray.direction * (_FocusDistance * (1 - ((top_left + top_right + botom_left + botom_right))));
-
-    // float focal_length = _FocusDistance;
-
-    // float3 focus_a = _RedSphere.xyz;
-    // float3 focus_b = _GreenSphere.xyz;
-    // float3 focus_c = _BlueSphere.xyz;
-
-    // float3 normal = normalize(cross(focus_b - focus_a , focus_c - focus_a));
-
-    // float3 tilt = float3(0.0f, 0.0f, 0.0f);
-    // if (abs(normal.x) > abs(normal.y))
-    // {
-    //     tilt.x = (focus_a.z - focus_b.z) * focal_length /
-    //         (focus_a.z * focus_b.x - focus_b.z * focus_a.x +
-    //         (focus_a.z * focus_b.y - focus_b.z * focus_a.y) *
-    //         normal.y / normal.x);
-
-    //     tilt.y = tilt.x * normal.y / normal.x;
-    // }
-    // else if (abs(normal.y) > 0.0)
-    // {
-    //     tilt.y = (focus_a.z - focus_b.z) * focal_length /
-    //         (focus_a.z * focus_b.y - focus_b.z * focus_a.y +
-    //         (focus_a.z * focus_b.x - focus_b.z * focus_a.x) *
-    //         normal.x / normal.y);
-
-    //     tilt.x = tilt.y * normal.x / normal.y;
-    // }
-    // tilt.z = sqrt(1.0 - tilt.x * tilt.x - tilt.y * tilt.y);
-
-    // // return float4(tilt.x, tilt.y, tilt.z, 1.0f);
-    // float aperture = _DefocusRadius;
-
-    // t = dotProduct(p0 - l0, n) / dotProduct(n, l); 
+    float3 focal_point = camera_ray.origin + camera_ray.direction * focal_plane_distance;
     
     float3 result = float3(0.0f, 0.0f, 0.0f);
     float samples = 0.0f;
@@ -357,59 +238,6 @@ float4 CalculateTiltShiftRayResult(float2 uv)
     result /= samples;
     return float4(result, 1);
 }
-
-// float4 CalculateTiltShiftRayResult(float2 uv)
-// {
-//     // return float4(0.0f, 0.0f, 0.0f, 1.0f);
-
-//     Ray camera_ray = CreateCameraRay(uv);
-//     float3 focal_point = camera_ray.origin + camera_ray.direction * _FocusDistance;
-
-//     // this might instead need to be like the magnitude of the a vectror between
-//     // the camera and the focal point
-//     float focal_length = _FocusDistance;
-
-//     float3 focus_a = _RedSphere.xyz;
-//     float3 focus_b = _GreenSphere.xyz;
-//     float3 focus_c = _BlueSphere.xyz;
-
-//     // Focal plane values (precomputable)
-//     float3 normal = normalize(cross(focus_b - focus_a, focus_c - focus_a));
-    
-//     // Lens values (precomputable)
-//     float3 tilt = float3(0.0f, 0.0f, 0.0f);
-//     if (abs(normal.x) > abs(normal.y))
-//     {
-//         tilt.x = (focus_a.z - focus_b.z) * focal_length /
-//             (focus_a.z * focus_b.x - focus_b.z * focus_a.x +
-//             (focus_a.z * focus_b.y - focus_b.z * focus_a.y) *
-//             normal.y / normal.x);
-
-//         tilt.y = tilt.x * normal.y / normal.x;
-//     }
-//     else if (abs(normal.y) > 0.0)
-//     {
-//         tilt.y = (focus_a.z - focus_b.z) * focal_length /
-//             (focus_a.z * focus_b.y - focus_b.z * focus_a.y +
-//             (focus_a.z * focus_b.x - focus_b.z * focus_a.x) *
-//             normal.x / normal.y);
-
-//         tilt.x = tilt.y * normal.x / normal.y;
-//     }
-//     tilt.z = sqrt(1.0 - tilt.x * tilt.x - tilt.y * tilt.y);
-
-//     float3 basis_u = normalize(cross(tilt, abs(tilt.x) > abs(tilt.y) ? 
-//         float3(0.0, 1.0, 0.0) : 
-//         float3(1.0, 0.0, 0.0)));
-
-//     float3 basis_v = cross(tilt, basis_u);
-//     float aperture = _DefocusRadius;
-
-//     float image_plane = focus_a.z * focal_length /
-//         (dot(focus_a , tilt) - focal_length);
-
-//     return float4(0.0f, 0.0f, 0.0f, 1.0f);
-// }
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)

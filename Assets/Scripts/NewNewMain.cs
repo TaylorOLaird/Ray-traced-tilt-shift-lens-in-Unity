@@ -30,10 +30,10 @@ public class NewNewMain : MonoBehaviour
     [Range(-45.0f, 45.0f)]
     public float _YTilt = 0.0f;
 
-    public float _XTiltNormalized = 0.0f;
-    public float _YTiltNormalized = 0.0f;
+    // public float _XTiltNormalized = 0.0f;
+    // public float _YTiltNormalized = 0.0f;
 
-    public Vector3 _PlaneNormal = Vector3.zero;
+    private Vector3 _PlaneNormal = Vector3.zero;
 
     public bool _ShowPlaneDebug = true;
     [Range(0.01f, 3.0f)]
@@ -75,8 +75,8 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetFloat("_PlaneOriginY", PlaneOrigin.position.y);
         RayTracingShader.SetFloat("_PlaneOriginZ", PlaneOrigin.position.z);
 
-        _XTiltNormalized = _XTilt / 45.0f;
-        _YTiltNormalized = _YTilt / 45.0f;
+        // _XTiltNormalized = _XTilt / 45.0f;
+        // _YTiltNormalized = _YTilt / 45.0f;
         _PlaneNormal = PlaneNormalRef.position - PlaneOrigin.position;
     }
 
