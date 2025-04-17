@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class PlaneScript : MonoBehaviour
 {
-    public NewNewMain rayTracingScript;
+    public RayTracerMain rayTracingScript;
     private GameObject _Plane;
     // Start is called before the first frame update
     void Start()

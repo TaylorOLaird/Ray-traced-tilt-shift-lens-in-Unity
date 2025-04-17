@@ -1,15 +1,11 @@
 using UnityEngine;
 
-public class NewNewMain : MonoBehaviour
+public class RayTracerMain : MonoBehaviour
 {
     public ComputeShader RayTracingShader;
     private RenderTexture _target;
     private Camera _camera;
     public Texture SkyboxTexture;
-
-    public GameObject RedSphere;
-    public GameObject GreenSphere;
-    public GameObject BlueSphere;
 
     public Transform PlaneOrigin;
     public Transform PlaneNormalRef;
@@ -30,9 +26,6 @@ public class NewNewMain : MonoBehaviour
     [Range(-45.0f, 45.0f)]
     public float _YTilt = 0.0f;
 
-    // public float _XTiltNormalized = 0.0f;
-    // public float _YTiltNormalized = 0.0f;
-
     private Vector3 _PlaneNormal = Vector3.zero;
 
     public bool _ShowPlaneDebug = true;
@@ -40,8 +33,9 @@ public class NewNewMain : MonoBehaviour
     public float _DefocusRadius = 0.0f;
     [Range(1.0f, 10.0f)]
     public float _FocusDistance = 4.0f;
-    // public float _DefocusRadius = 1.0f;
-    // public float _FocusDistance = 1.0f;
+
+    // list of spheres to be rendered
+    public GameObject[] Spheres;
 
     private void Awake()
     {
@@ -54,10 +48,16 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetMatrix("_CameraInverseProjection", _camera.projectionMatrix.inverse);
         RayTracingShader.SetTexture(0, "_SkyboxTexture", SkyboxTexture);
 
-        // store the sphere centers and scale as a vector4
-        RayTracingShader.SetVector("_RedSphere", new Vector4(RedSphere.transform.position.x, RedSphere.transform.position.y, RedSphere.transform.position.z, RedSphere.transform.localScale.x / 2.0f));
-        RayTracingShader.SetVector("_GreenSphere", new Vector4(GreenSphere.transform.position.x, GreenSphere.transform.position.y, GreenSphere.transform.position.z, GreenSphere.transform.localScale.x / 2.0f));
-        RayTracingShader.SetVector("_BlueSphere", new Vector4(BlueSphere.transform.position.x, BlueSphere.transform.position.y, BlueSphere.transform.position.z, BlueSphere.transform.localScale.x / 2.0f));
+        if (Spheres.Length != 9)
+        {
+            Debug.LogError("Spheres array must contain exactly 9 elements.");
+            return;
+        }
+
+        for (int i = 0; i < Spheres.Length; i++)
+        {
+            RayTracingShader.SetVector("_Sphere" + i, new Vector4(Spheres[i].transform.position.x, Spheres[i].transform.position.y, Spheres[i].transform.position.z, Spheres[i].transform.localScale.x / 2.0f));
+        }
 
         RayTracingShader.SetFloat("_DefocusRadius", _DefocusRadius);
         RayTracingShader.SetFloat("_FocusDistance", _FocusDistance);
@@ -75,8 +75,6 @@ public class NewNewMain : MonoBehaviour
         RayTracingShader.SetFloat("_PlaneOriginY", PlaneOrigin.position.y);
         RayTracingShader.SetFloat("_PlaneOriginZ", PlaneOrigin.position.z);
 
-        // _XTiltNormalized = _XTilt / 45.0f;
-        // _YTiltNormalized = _YTilt / 45.0f;
         _PlaneNormal = PlaneNormalRef.position - PlaneOrigin.position;
     }
 

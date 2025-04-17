@@ -6,15 +6,12 @@ float4x4 _CameraInverseProjection;
 Texture2D<float4> _SkyboxTexture;
 SamplerState sampler_SkyboxTexture;
 
-float4 _RedSphere;
-float4 _GreenSphere;
-float4 _BlueSphere;
+// float4 _RedSphere;
+// float4 _GreenSphere;
+// float4 _BlueSphere;
 
 float _DefocusRadius;
 float _FocusDistance;
-
-float _XTilt;
-float _YTilt;
 
 float _PlaneNormalX;
 float _PlaneNormalY;
@@ -23,6 +20,16 @@ float _PlaneNormalZ;
 float _PlaneOriginX;
 float _PlaneOriginY;
 float _PlaneOriginZ;
+
+float4 _Sphere0;
+float4 _Sphere1;
+float4 _Sphere2;
+float4 _Sphere3;
+float4 _Sphere4;
+float4 _Sphere5;
+float4 _Sphere6;
+float4 _Sphere7;
+float4 _Sphere8;
 
 // 0 = pinhole, 1 = pinhole with antialiasing, 2 = thin lens, 3 = tilt shift
 int _CameraMode;
@@ -79,7 +86,6 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
     bestHit.normal = normalize(bestHit.position - sphere.xyz);
 }
 
-// bool intersectPlane(const Vec3f &n, const Vec3f &p0, const Vec3f &l0, const Vec3f &l, float &t)
 float intersectPlane(Ray ray)
 {
     float3 n = normalize(float3(_PlaneNormalX, _PlaneNormalY, _PlaneNormalZ));
@@ -95,10 +101,17 @@ float intersectPlane(Ray ray)
 RayHit Trace(Ray ray)
 {
     RayHit bestHit = NewRayHit();
-    // IntersectSphere(ray, bestHit, float4(0, 0.0f, 0, 1.0f));
-    IntersectSphere(ray, bestHit, _RedSphere);
-    IntersectSphere(ray, bestHit, _GreenSphere);
-    IntersectSphere(ray, bestHit, _BlueSphere);
+    // Intersect with spheres
+    IntersectSphere(ray, bestHit, _Sphere0);
+    IntersectSphere(ray, bestHit, _Sphere1);
+    IntersectSphere(ray, bestHit, _Sphere2);
+    IntersectSphere(ray, bestHit, _Sphere3);
+    IntersectSphere(ray, bestHit, _Sphere4);
+    IntersectSphere(ray, bestHit, _Sphere5);
+    IntersectSphere(ray, bestHit, _Sphere6);
+    IntersectSphere(ray, bestHit, _Sphere7);
+    IntersectSphere(ray, bestHit, _Sphere8);
+
     return bestHit;
 }
 
@@ -111,13 +124,14 @@ float3 Shade(inout Ray ray, RayHit hit)
     }
     else
     {
-        // Sample the skybox and write it
+        // Sample the skybox
         float theta = acos(ray.direction.y) / -PI;
         float phi = atan2(ray.direction.x, -ray.direction.z) / -PI * 0.5f;
-        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi + 1, theta), 0).xyz;
+        return _SkyboxTexture.SampleLevel(sampler_SkyboxTexture, float2(phi, theta), 0).xyz;
     }
 }
 
+// Based on method from class
 float2 grid_to_disc(float x, float y)
 {
     float r, phi;
@@ -132,6 +146,7 @@ float2 grid_to_disc(float x, float y)
 
     return float2(r * cos(phi), r * sin(phi));
 }
+
 
 Ray CreateCameraRay(float2 uv)
 {
@@ -208,16 +223,14 @@ float4 CalculateThinLensRayResult(float2 uv)
 
 float4 CalculateTiltShiftRayResult(float2 uv)
 {
-    float _XTiltNormalized = _XTilt / 45.0f;
-    float _YTiltNormalized = _YTilt / 45.0f;
-    
+    // Simulate a tilt-shift lens with thin lens model
     Ray camera_ray = CreateCameraRay(uv);
     float focal_plane_distance = intersectPlane(camera_ray);
-
     float3 focal_point = camera_ray.origin + camera_ray.direction * focal_plane_distance;
     
     float3 result = float3(0.0f, 0.0f, 0.0f);
     float samples = 0.0f;
+
     // Sample the lens disc
     for (float i = -0.5f * _DefocusRadius; i <= 0.5f * _DefocusRadius; i += 0.1f)
     {
